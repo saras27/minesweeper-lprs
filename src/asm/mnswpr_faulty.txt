@@ -1,0 +1,1075 @@
+.data
+8			//&cursor.x 
+75			//&masked minefield[0]
+0
+40			//75 = 1 sec, 1 = almost no delay
+0x100		//dec = 256
+0x140		//dec = 312
+0x202		//dec = 512		//514 in this case so we load it as is
+141			//unused  will be used for a stack							
+3,3			//8 = &cursor.x 
+0 , 0, 0, 0, 0, 0, 0, 0			//10  =  &minefield[0]
+0 , 8, 0, 0, 0, 0, 0, 0			//  
+0 , 0, 0, 0, 0, 0, 0, 0			//
+0 , 0, 0, 0, 0, 0, 0, 0			//if (minefield[i] == 8) then there's a mine there
+0 , 0, 0, 0, 0, 0, 0, 0			//
+0 , 0, 0, 0, 0, 0, 0, 0			//
+0 , 0, 0, 0, 8, 8, 0, 0			//
+0 , 0, 0, 0, 8, 8, 0, 0			//
+-1								//minefield end = 74
+0 , 0, 0, 0, 0, 0, 0, 0			//&masked minefield[0] = 75
+0 , 0, 0, 0, 0, 0, 0, 0
+0 , 0, 0, 0, 0, 0, 0, 0
+0 , 0, 0, 0, 0, 0, 0, 0
+0 , 0, 0, 0, 0, 0, 0, 0
+0 , 0, 0, 0, 0, 0, 0, 0
+0 , 0, 0, 0, 0, 0, 0, 0
+0 , 0, 0, 0, 0, 0, 0, 0			
+-1								//masked minefield end = 139
+0								//&random_number = 140								
+-1								//&stack_top_p[last]  = 141 
+
+
+.text
+/*
+	common register usage:
+	R0 - tmp 
+	R1 - tmp 
+	R2 - tmp
+	R3 - tmp
+	R4 - tmp
+	R5 - p_pb_dec		//must be a const register and only used for input
+	R6 - tmp
+	R7 - 'p_rgb_matrix' or tmp
+*/
+
+begin:
+	;;initial setup
+	sub R0,R0,R0 
+	inc R0, R0	
+	inc R0, R0                  
+	inc R0, R0                  
+	inc R0, R0					;;R0 = 4           
+	ld R7, R0                   ;; R7 <- p_rgb_matrix 
+	inc R0, R0                  ;; addr = 5
+	inc R0, R0                  ;; addr = 6
+	ld R5, R0                   ;; R5 <- pb_dec
+	
+
+
+minefield_randomizer_setup:
+	sub R0,R0,R0
+	inc R1,R0				;;R1 = 1
+	ld R0,R0				;;R0 = 8 
+	mov R3,R0				;;R3 = 8 = const
+	inc R0,R0
+	inc R0,R0				;;R0 = 10 = &minefield[0] 
+	ld R1,R1				;;R1 = 75 = &minefield_mask[0]
+	shl R1,R1				;;R1 = 150
+	sub R1,R1,R0			;;R1 = 140 = &random_number
+	ld R1,R1				;;R1 = random_number 
+	shl R6,R3
+	shl R6,R6
+	shl R6,R6				
+	dec R6,R6				;;R6 = 63 = const		
+	
+minefield_randomizer_start:
+	;;Note: R0 = &minefield[0]   R1 = random_number (0-63) = (0 - 2^6)   R3 = 8 = const
+	
+	ld R2,R0				;;R2 = minefield[i]
+	jmps minefield_randomizer_end
+	
+	/*
+	sub R4,R2,R3			;;if (minefield[i] - 8 < 0) 
+	jmpns skip_minefield_randomizer_set_field_to_zero
+		sub R4,R4,R4
+		st R4,R0			;;minefield[i] = 0
+		jmp minefield_randomizer_continue
+	skip_minefield_randomizer_set_field_to_zero:
+	*/
+	
+	
+	sub R4,R2,R3 			;;if (minefield[i] - 8 != 0) continue
+	jmpnz minefield_randomizer_continue
+	
+	st R4,R0				;;minefield[i] = 0
+	add R4,R1,R0			;;
+	and R4,R4,R6			;;R4 = (random_number + &minefield[i]) % 64  = 0 - 63
+	
+	add R4,R4,R3			
+	inc R4,R4
+	inc R4,R4				;;R4 = ((random_number + i) % 64) +10 = &minefield[some_random_field]
+	
+	st R3,R4				
+	
+	shl R1,R1
+	inc R1,R1				;;R1 = R1*2 +1  (further randomize the random number)
+	
+	minefield_randomizer_continue:
+		inc R0,R0
+		jmp minefield_randomizer_start
+minefield_randomizer_end:	
+
+
+
+reset_minefield_mask_setup:
+	sub R0,R0,R0
+	inc R0,R0
+	ld R0,R0				;;R0 = 75 = &minefield_mask[0]
+	sub R2,R2,R2			;;R2 = 0 = const
+	
+reset_minefield_mask_start:
+	
+	ld R1,R0				;;if (minefield_mask[i] == -1) break
+	jmps reset_minefield_mask_end
+	
+	st R2,R0				;;minefield_mask[i] = 0 
+
+	reset_minefield_mask_continue:
+		inc R0,R0
+		jmp reset_minefield_mask_start
+reset_minefield_mask_end:
+
+reset_minefield_setup:
+	sub R0,R0,R0
+	ld R0,R0
+	inc R0,R0
+	inc R0,R0				;;R0 = 10
+	sub R3,R3,R3
+	ld R3,R3				;;R3 = 8 = const
+	sub R1,R1,R1			;;R1 = 0 = const 
+	
+reset_minefield_start:
+	ld R2,R0
+	jmps reset_minefield_end
+	
+	sub R4,R2,R3			;;minefield[i] - 8 == 0
+	jmpz reset_minefield_continue
+	
+	st R1,R0				;;minefield[i] = 0
+	
+	reset_minefield_continue:
+		inc R0,R0
+		jmp reset_minefield_start
+reset_minefield_end:
+
+	
+	
+	
+	
+minefield_setup:
+	sub R0,R0,R0			
+	ld R0,R0				;;R0 = 8 = &cursor.x
+	mov R1,R0				;;R1 = 8 = const
+	inc R0,R0
+	inc R0,R0				;;R0 = &matrix[0]
+	
+	
+minefield_setup_start:
+	ld R2,R0				;;R2 = minefield[i]
+	jmps minefield_setup_end
+	
+	sub R3,R2,R1			;;if (minefield[i] != 8) continue
+	jmpnz minefield_setup_continue
+	
+	mov R4,R1				
+	inc R4,R4
+	inc R4,R4				;;R4 = 10 
+	sub R4,R0,R4			;;R4 = &minefield[i] - &minefield[0] = i
+	
+	mov R2,R1
+	dec R2,R2				;;R2 = 7
+	and R2,R2,R4			;;R2 = 7 AND i = i % 8
+	mov R3,R4
+	shr R3,R3
+	shr R3,R3
+	shr R3,R3				;;R3 = i/8 
+	;;R2 = x   R3 = y   R1 = 8 = const
+	
+	
+	
+	
+	;;CHECK UPPER ROW
+	mov R3,R3
+	jmpz minefield_setup_skip_upper_row_check
+
+		sub R0,R0,R1		;;R0 -= 8 
+		ld R4,R0
+		;;inc R4,R4
+		;;st R4,R0			;;minefield[i-8] += 1
+		;;;;;;;;;;;;;
+		sub R4,R4,R1		;;R4 = minefield[i-8] - 8 
+		jmpz minefield_setup_skip_upper_row_check_up
+			ld R4,R0
+			inc R4,R4
+			st R4,R0			;;minefield[i-8] += 1
+		minefield_setup_skip_upper_row_check_up:
+		;;;;;;;;;;;;;
+		
+		;;new:
+		mov R2,R2
+		jmpz minefield_setup_skip_upper_row_check_left
+			dec R0,R0
+			ld R4,R0
+			;;inc R4,R4
+			;;st R4,R0		;;minefield[i-8-1] += 1
+			;;;;;;;;;;;;;
+			sub R4,R4,R1
+			jmpz minefield_setup_skip_upper_row_check_left_mined
+				ld R4,R0
+				inc R4,R4
+				st R4,R0		;;minefield[i-8-1] += 1
+			minefield_setup_skip_upper_row_check_left_mined:
+			;;;;;;;;;;;;;
+			inc R0,R0		
+		minefield_setup_skip_upper_row_check_left:
+		
+		mov R4,R2
+		inc R4,R4
+		sub R4,R4,R1			
+		jmpz minefield_setup_skip_upper_row_check_right
+			inc R0,R0
+			ld R4,R0
+			;;inc R4,R4
+			;;st R4,R0			;;minefield[i - 8 + 1] += 1
+			sub R4,R4,R1
+			jmpz minefield_setup_skip_upper_row_check_right_mined
+				ld R4,R0
+				inc R4,R4
+				st R4,R0		;;minefield[i - 8 + 1] += 1
+			minefield_setup_skip_upper_row_check_right_mined:
+			dec R0,R0		;;minefield[i-8+1] += 1
+		minefield_setup_skip_upper_row_check_right:
+		
+		add R0,R0,R1		;;R0 += 8
+		
+	minefield_setup_skip_upper_row_check:
+	
+	
+	;;CHECK MIDDLE ROW
+	mov R2,R2
+	jmpz minefield_setup_skip_middle_row_left
+		dec R0,R0
+		ld R4,R0
+		;;inc R4,R4
+		;;st R4,R0
+		sub R4,R4,R1
+		jmpz minefield_setup_skip_middle_row_left_mined
+			ld R4,R0
+			inc R4,R4
+			st R4,R0
+		minefield_setup_skip_middle_row_left_mined:
+		
+		inc R0,R0			;;minefield[i-1] += 1
+	minefield_setup_skip_middle_row_left:
+
+	mov R4,R2
+	inc R4,R4
+	sub R4,R4,R1
+	jmpz minefield_setup_skip_middle_row_right
+		inc R0,R0
+		ld R4,R0
+		;;inc R4,R4
+		;;st R4,R0
+		sub R4,R4,R1
+		jmpz minefield_setup_skip_middle_row_right_mined
+			ld R4,R0
+			inc R4,R4
+			st R4,R0
+		minefield_setup_skip_middle_row_right_mined:
+		
+		dec R0,R0			;;minefield[i-1] += 1
+	minefield_setup_skip_middle_row_right:
+	
+	
+	;;CHECK LOWER ROW
+	mov R4,R3
+	inc R4,R4
+	sub R4,R4,R1			;;if (i >= 8) then skip lower row check
+	jmpz minefield_setup_skip_lower_row_check
+		
+		add R0,R0,R1		;; NOTE: R0 = i+8 = new i
+		ld R4,R0
+		;;inc R4,R4
+		;;st R4,R0			;;minefield[i+8] += 1
+		sub R4,R4,R1
+		jmpz minefield_setup_skip_lower_row_check_mined
+			ld R4,R0
+			inc R4,R4
+			st R4,R0			;;minefield[i+8] += 1
+		minefield_setup_skip_lower_row_check_mined:
+		
+		
+		mov R2,R2
+		jmpz minefield_setup_skip_lower_row_check_left
+			dec R0,R0
+			ld R4,R0
+			;;inc R4,R4
+			;;st R4,R0		;;minefield[i+8-1] += 1
+			sub R4,R4,R1
+			jmpz minefield_setup_skip_lower_row_check_left_mined
+				ld R4,R0
+				inc R4,R4
+				st R4,R0		;;minefield[i+8-1] += 1
+			minefield_setup_skip_lower_row_check_left_mined:
+			
+			inc R0,R0
+		minefield_setup_skip_lower_row_check_left:
+		
+		mov R4,R2
+		inc R4,R4
+		sub R4,R4,R1
+		jmpz minefield_setup_skip_lower_row_check_right
+			inc R0,R0
+			ld R4,R0
+			;;inc R4,R4
+			;;st R4,R0			;;minefield[i+8+1] += 1
+			sub R4,R4,R1
+			jmpz minefield_setup_skip_lower_row_check_right_mined
+				ld R4,R0
+				inc R4,R4
+				st R4,R0		;;minefield[i+8+1] += 1
+			minefield_setup_skip_lower_row_check_right_mined:
+			
+			dec R0,R0		;;minefield[i+8+1] += 1
+		minefield_setup_skip_lower_row_check_right:
+		
+		sub R0,R0,R1		;;NOTE: R0 = i-8 = old i
+		
+	minefield_setup_skip_lower_row_check:
+	
+	
+	minefield_setup_continue:
+	inc R0,R0
+	jmp minefield_setup_start
+minefield_setup_end:
+
+
+
+
+frame_sync_rising_edge:										;;sPC = 125
+	sub R6,R6,R6
+	ld R6,R6					;;R6 = 8
+	dec R6,R6
+	dec R6,R6
+	dec R6,R6
+	ld R6,R6					;;R6 = &p_frame_sync
+frame_sync_wait_0:
+	ld R0, R6                   ;; R0 <- p_frame_sync
+	jmpnz frame_sync_wait_0
+frame_sync_wait_1:
+	ld R0, R6                   ;; R0 <- p_frame_sync
+	jmpz frame_sync_wait_1
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+draw_minefield_setup:
+	sub R3,R3,R3			;;R3 = color of the field  
+	sub R0,R0,R0			
+	ld R0,R0				;;R0 = 8 = &cursor.x
+	shr R7,R0				;;R7 = 4 = &rgb_matrix 
+	ld R7,R7				
+	inc R0,R0				;;
+	inc R0,R0				;;R0 = &minefield[0]
+	mov R1,R0				;;R1 = R0 = &minefield[0] = 10 = const
+	sub R4,R4,R4
+	ld R4,R4				
+	shl R4,R4				;;
+	shl R4,R4				;;
+	shl R4,R4				;;
+	inc R4,R4				;;R4 = 65 = const 
+
+draw_minefield_start:		;;DRAWING WITH THE MASK
+	;;add R3,R4,R0			;;R3 = &minefield_mask[i] = 75
+	;;ld R3,R3				;;if (minefield_mask[i] == 0 ) continue
+	;;jmpz draw_minefield_continue
+	;;mov R3,R3
+	;;jmps draw_minefield_end
+	
+	
+	ld R3,R0				;;R3 = minefield[i]  
+	jmps draw_minefield_end
+	sub R2,R0,R1			;;R2 = &minefield[i] - &minefield[0] = i
+	add R2,R2,R7			;;R2 = i + &rgb_matrix
+	st R3,R2				
+	
+	draw_minefield_continue:
+		inc R0,R0
+	jmp draw_minefield_start
+draw_minefield_end:
+
+
+draw_cursor:
+	sub R7,R7,R7
+	ld R7,R7
+	shr R7,R7
+	ld R7,R7					;;R7 = &rgb_matrix 
+	
+	sub R0,R0,R0
+	sub R3,R3,R3
+	ld R3,R3
+	dec R3,R3					;;R3 = 7 = CYAN
+	ld R0,R0					;;R0 = 8
+	ld R1,R0					
+	inc R0,R0
+	ld R2,R0					
+	;;R1 = cursor.x   R2 = cursor.y
+	shl R2,R2
+	shl R2,R2
+	shl R2,R2					;;R2 *= 8
+	add R2,R2,R1				;;R2 += cursor.x
+	add R2,R2,R7				;;R2 = &RGB_matrix pos
+	st R3,R2					;;RGB_matrix[pos] = GREEN
+draw_cursor_end:
+
+
+//The CODE IS ALREADY SLOW AS $it
+count_frames_begin:
+	sub R0, R0, R0              ;; addr = 0
+	inc R0, R0
+	inc R0, R0
+	ld R1, R0                   ;; R1 <- frame_cnt
+	inc R0, R0
+	ld R2, R0                   ;; R2 <- frames_per_heartbeat
+	dec R0, R0
+	inc R1, R1                  ;; frame_cnt++;
+	sub R2, R2, R1              ;; frame_cnt == frames_per_heartbeat
+	jmpz count_frames_heatbeat  ;; Jump if equal.
+	st R1, R0                   ;; R1 -> frame_cnt
+	jmp frame_sync_rising_edge
+count_frames_heatbeat:
+	sub R1, R1, R1
+	st R1, R0                   ;; R1 i.e. 0 -> frame_cnt
+count_frames_end:
+
+
+
+handle_input_start:
+	
+
+	
+	
+
+handle_input_center_press:	
+
+handle_input_center_press_start:
+	ld R0,R5					;;R0 = iPB_CENTER = bool			
+;;	dec R5,R5
+;;	dec R5,R5					;;RESET R5 TO DEFAULT since we clear the input buffer the 1 clock after getting the address signal to it's value
+
+	mov R0,R0					;;if iPB_CENTER = '0' then skip
+	jmpz handle_input_center_press_end
+	
+	
+	sub R0,R0,R0
+	ld R0,R0
+	ld R1,R0
+	inc R0,R0
+	ld R2,R0	
+	;; R1 = cursor.x  R2 = cursor.y 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	mov R4,R2
+	shl R4,R4
+	shl R4,R4
+	shl R4,R4
+	add R4,R4,R1				;;R4 = i = cursor.y * 8 + cursor.x				;;sPC = 237
+
+	;;Set this 'i' to the random number that will be used to randomize the minefield
+		sub R0,R0,R0
+		ld R0,R0					;;R0 = 8
+		mov R3,R0
+		inc R3,R3
+		inc R3,R3					;;R3 = 10
+		shl R0,R0
+		shl R0,R0
+		shl R0,R0
+		shl R0,R0					;;R0 = 128
+		add R0,R0,R3				;;R0 = 138
+		inc R0,R0
+		inc R0,R0					;;R0 = 140 = &random_number
+		st R4,R0					;;random_number = i
+	;;continue with the input handling function
+	
+	sub R0,R0,R0
+	ld R0,R0
+	inc R0,R0
+	inc R0,R0					;;R0 = 10 = &minefield[0]
+	add R4,R4,R0				;;R4 = &minefield[i]
+	ld R0,R4					;;R0 = minefield[i]			
+	sub R1,R1,R1
+	ld R1,R1					;;R1 = 8 = const
+	
+	sub R1,R0,R1				;; if (minefield[i] - 8 == 0) game_over			
+	;;TODO	REPLACE WITH GAME OVER
+	jmpz game_over				;;										
+	
+	
+
+
+
+
+push_to_stack:
+	;;NOTE: R4 = &minefield[i] aka. the one that's pressed
+	sub R0,R0,R0
+	ld R0,R0
+	dec R0,R0					;;R0 = 7 = &stack_top_p						;;sPC = 263
+	mov R3,R0					;;R3 = 7 = &stack_top_p
+	ld R0,R0					;;R0 = &stack_top_p[last]
+	inc R0,R0					;;R0 = &stack_top_p[last+1]
+	st R4,R0					;;stack_top_p.add(R4)
+	st R0,R3					;;&stack_top_p += 1 	(save the new size)
+	
+
+pop_stack_setup:
+	sub R0,R0,R0				;;sPC = 269
+	ld R0,R0
+	dec R0,R0					;;R0 = 7 = &stack_top_p	
+
+pop_stack_start:
+	;;R2 = const register that holds "&minefield[i] to check"
+	ld R1,R0					;;R1 = &stack_top_p[last]
+	ld R2,R1					;;R2 = &minefield[i] to check
+	jmps pop_stack_empty		;; if we reach the end of the stack
+	
+	
+	;;Pop the top element from the stack
+	sub R0,R0,R0
+	ld R0,R0
+	dec R0,R0					;;R0 = 7 = &stack_top_p
+	ld R1,R0					;;R1 = &stack_top_p[last]
+	dec R1,R1
+	st R1,R0
+	
+	ld R3,R2					;;R3 = minefield[i] to check
+	sub R4,R4,R4
+	ld R4,R4
+	sub R4,R3,R4				;;if (minefield[i] - 8 == 0) then skip
+	jmpz pop_stack_end			
+
+	sub R1,R1,R1
+	ld R1,R1
+	shl R1,R1
+	shl R1,R1
+	shl R1,R1
+	inc R1,R1					;;R1 = 65
+	add R1,R1,R2				;;R1 = &minefield_mask[i] = 65 + &minefield[i] 				;;sPC = 292
+	ld R4,R1					;;R4 = minefield_mask[i] 
+	jmpnz pop_stack_end			;;if (minefield_mask[i] != '0') skip	
+	
+	mov R3,R3					;;if (minefield[i] != 0) then only unmask itself
+	jmpnz pop_stack_unmask_itself
+	
+	
+	
+	;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	;;push all the surrounding fields to the stack
+	
+	;;Get x and y of the field
+	sub R0,R0,R0
+	ld R0,R0
+	inc R0,R0
+	inc R0,R0					;;R0 = 10
+	sub R0,R2,R0				;;R0 = &minefield[i] - &minefield[0] = i
+	sub R3,R3,R3
+	ld R3,R3					
+	dec R3,R3					;;R3 = 7
+	and R3,R3,R0				;;R3 = i % 8 = i AND 7 = x
+	mov R4,R0					;;R4 = i
+	shr R4,R4
+	shr R4,R4
+	shr R4,R4					;;R4 = i / 8 = y			;;sPC = 261
+	
+	sub R6,R6,R6
+	ld R6,R6
+	shl R6,R6
+	shl R6,R6
+	shl R6,R6
+	inc R6,R6					;;R6 = 65 = const
+	;;R3 = x   R4 = y     of the field  R2 = &minefield[i]
+	
+	
+	
+	
+	mov R4,R4					;;if (y == 0) don't add the upper row
+	jmpz skip_push_upper_row_to_stack
+		
+		;;push &minefield[i-8]
+		mov R0,R2				;;R0 = &minefield[i]
+		sub R1,R1,R1
+		ld R1,R1				;;R1 = 8
+		sub R0,R0,R1			;;R0 = &minefield[i-8]
+		
+		;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+			add R1,R0,R6		;;R1 = &minefield_mask[i-8]
+			ld R1,R1			;;R1 = minefield_mask[i-8] != 0 then skip
+			jmpnz skip_push_upper_row_to_stack_up_skip
+		;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+		
+		sub R1,R1,R1
+		ld R1,R1
+		dec R1,R1				;;R1 = 7 = &stack_top_p
+		ld R1,R1				;;R1 = &stack_top_p[last]
+		inc R1,R1				
+		st R0,R1				;;stack_top_p[last+1] = &minefield[i-8]
+		sub R0,R0,R0
+		ld R0,R0
+		dec R0,R0				;;R0 = 7 = &stack_top_p
+		st R1,R0				;;stack_top_p.len += 1
+		
+		;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+			skip_push_upper_row_to_stack_up_skip:
+		;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+		/*
+		mov R3,R3
+		jmpz skip_push_upper_row_to_stack_left_field
+			;;push &minefield[i - 8 - 1]
+			sub R1,R1,R1
+			ld R1,R1			;;R1 = 8
+			sub R0,R2,R1		;;R0 = &minefield[i - 8]
+			dec R0,R0			;;R0 = &minefield[i - 8 - 1]
+			
+			;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				add R1,R0,R6		;;R1 = &minefield_mask[i-8-1] 
+				ld R1,R1			;;R1 = minefield_mask[i-8-1] != 0 then skip
+				jmpnz skip_push_upper_row_to_stack_up_left_skip
+			;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+			
+			sub R1,R1,R1
+			ld R1,R1
+			dec R1,R1			;;R1 = 7 = &stack_top_p
+			ld R1,R1			;;R1 = &stack_top_p[last]
+			inc R1,R1
+			st R0,R1			;;stack_top_p.add( &minefield[i - 8 - 1] )
+			sub R0,R0,R0
+			ld R0,R0
+			dec R0,R0
+			st R1,R0			;;stack_top_p += 1
+			;;inc R0,R0			;;R0 = &minefield[i - 8]			;;???????
+			
+			;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				skip_push_upper_row_to_stack_up_left_skip:
+			;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+			
+		skip_push_upper_row_to_stack_left_field:
+		
+		
+		
+		sub R1,R1,R1
+		ld R1,R1				;;R1 = 8
+		inc R0,R3
+		sub R0,R0,R1			;;R0 = x + 1 - 8
+		jmpz skip_push_upper_row_to_stack_right_field
+			;;push &minefield[i - 8 + 1]
+			sub R1,R1,R1
+			ld R1,R1			;;R1 = 8 
+			mov R0,R2
+			sub R0,R0,R1		
+			inc R0,R0			;;R0 = &minefield[i - 8 + 1]
+			
+			;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				add R1,R0,R6		;;R1 = &minefield_mask[i-8+1] == 1 then skip
+				ld R1,R1			;;R1 = minefield_mask[i-8+1] != 0 then skip
+				jmpnz skip_push_upper_row_to_stack_up_right_skip
+			;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+			
+			sub R1,R1,R1
+			ld R1,R1
+			dec R1,R1			;;R1 = 7 = &stack_top_p
+			ld R1,R1			;;R1 = &stack_top_p[last]
+			inc R1,R1
+			st R0,R1			;;stack_top_p.add( &minefield[i-8+1])
+			sub R0,R0,R0
+			ld R0,R0
+			dec R0,R0
+			st R1,R0			;;stack_top_p += 1
+			
+			;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				skip_push_upper_row_to_stack_up_right_skip:
+			;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+			
+		skip_push_upper_row_to_stack_right_field:
+		*/
+		
+	skip_push_upper_row_to_stack:
+	
+	
+	
+	;;push center left field
+	mov R3,R3					;;R0 = x - 1  
+	jmpz skip_push_center_row_to_stack_left_field
+		dec R0,R2				;;R0 = &minefield[i - 1]
+		
+		;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+			add R1,R0,R6		;;R1 = &minefield_mask[i-1] == 1 then skip
+			ld R1,R1			;;R1 = minefield_mask[i-1] != 0 then skip
+			jmpnz skip_push_upper_row_to_stack_center_left_skip
+		;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+		
+		sub R1,R1,R1
+		ld R1,R1
+		dec R1,R1				;;R1 = 7 = &stack_top_p
+		ld R1,R1
+		inc R1,R1
+		st R0,R1				;;stack_top_p.add( &minefield[i - 1])
+		sub R0,R0,R0
+		ld R0,R0
+		dec R0,R0
+		st R1,R0				;;stack_top_p += 1
+		
+		;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+			skip_push_upper_row_to_stack_center_left_skip:
+		;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+		
+	skip_push_center_row_to_stack_left_field:
+	
+	
+	
+	sub R1,R1,R1
+	ld R1,R1					;;R1 = 8
+	inc R0,R3
+	sub R0,R0,R1
+	jmpz skip_push_center_row_to_stack_right_field
+		inc R0,R2				;;R0 = &minefield[i + 1]
+		
+		;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+			add R1,R0,R6		;;R1 = &minefield_mask[i+1] == 1 then skip
+			ld R1,R1			;;R1 = minefield_mask[i+1] != 0 then skip
+			jmpnz skip_push_upper_row_to_stack_center_right_skip
+		;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+		
+		sub R1,R1,R1
+		ld R1,R1
+		dec R1,R1				;;R1 = 7 = &stack_top_p
+		ld R1,R1
+		inc R1,R1
+		st R0,R1				;;stack_top_p.add( &minefield[i + 1])
+		sub R0,R0,R0
+		ld R0,R0
+		dec R0,R0
+		st R1,R0				;;stack_top_p += 1
+		
+		;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+			skip_push_upper_row_to_stack_center_right_skip:
+		;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+		
+	skip_push_center_row_to_stack_right_field:
+	
+	
+	
+	
+	
+	sub R0,R0,R0
+	ld R0,R0
+	inc R1,R4
+	sub R0,R1,R0				;;y+1 -8 
+	jmpz skip_push_lower_row_to_stack
+		
+		
+		;;push &minefield[i+8]
+		mov R0,R2				;;R0 = &minefield[i]
+		sub R1,R1,R1
+		ld R1,R1				;;R1 = 8
+		add R0,R0,R1			;;R0 = &minefield[i+8]
+		
+		;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+			add R1,R0,R6		;;R1 = &minefield_mask[i+8] == 1 then skip
+			ld R1,R1			;;R1 = minefield_mask[i+8] != 0 then skip
+			jmpnz skip_push_lower_row_to_stack_lower_down_skip
+		;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+		
+		sub R1,R1,R1
+		ld R1,R1
+		dec R1,R1				;;R1 = 7 = &stack_top_p
+		ld R1,R1				;;R1 = &stack_top_p[last]
+		inc R1,R1				
+		st R0,R1				;;stack_top_p[last+1] = &minefield[i-8]
+		sub R0,R0,R0
+		ld R0,R0
+		dec R0,R0				;;R0 = 7 = &stack_top_p
+		st R1,R0				;;stack_top_p.len += 1
+		
+		;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+			skip_push_lower_row_to_stack_lower_down_skip:
+		;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+		
+		/*
+		mov R3,R3				;; if (x == 0) then skip
+		jmpz skip_push_lower_row_to_stack_left_field
+			;;push &minefield[i + 8 - 1]
+			sub R1,R1,R1
+			ld R1,R1			;;R1 = 8
+			mov R0,R2			;;
+			add R0,R0,R1		;;R0 = &minefield[i + 8]
+			dec R0,R0			;;R0 = &minefield[i + 8 - 1]
+			
+			;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				add R1,R0,R6		;;R1 = &minefield_mask[i+8-1] == 1 then skip
+				ld R1,R1			;;R1 = minefield_mask[i+8-1] != 0 then skip
+				jmpnz skip_push_lower_row_to_stack_lower_down_left_skip
+			;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+			
+				
+			sub R1,R1,R1
+			ld R1,R1
+			mov R0,R2		
+			add R0,R0,R1		;;R0 = &minefield[i + 8]
+			dec R0,R0			;;R0 = &minefield[i + 8 - 1]
+			
+			
+			sub R1,R1,R1
+			ld R1,R1
+			dec R1,R1				;;R1 = 7 = &stack_top_p
+			ld R1,R1				;;R1 = &stack_top_p[last]
+			inc R1,R1				
+			st R0,R1				;;stack_top_p[last+1] = &minefield[i-8]
+			sub R0,R0,R0
+			ld R0,R0
+			dec R0,R0				;;R0 = 7 = &stack_top_p
+			st R1,R0				;;stack_top_p.len += 1
+			
+			
+			;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				skip_push_lower_row_to_stack_lower_down_left_skip:
+			;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+			
+		skip_push_lower_row_to_stack_left_field:
+		
+		
+		
+		sub R1,R1,R1
+		ld R1,R1				;;R1 = 8
+		inc R0,R3
+		sub R0,R0,R1			;;R0 = x + 1 - 8
+		jmpz skip_push_lower_row_to_stack_right_field
+			;;push &minefield[i - 8 + 1]
+			mov R0,R2
+			add R0,R0,R1		
+			inc R0,R0			;;R0 = &minefield[i + 8 + 1]
+			
+			;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				add R1,R0,R6		;;R1 = &minefield_mask[i+8+1] == 1 then skip
+				ld R1,R1			;;R1 = minefield_mask[i+8+1] != 0 then skip
+				jmpnz skip_push_lower_row_to_stack_lower_down_right_skip
+			;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+			
+			mov R0,R2			
+			sub R1,R1,R1
+			ld R1,R1
+			add R0,R0,R1		;;R0 = &minefield[i + 8]
+			inc R0,R0			;;R0 = &minefield[i + 8 + 1]
+			
+			sub R1,R1,R1
+			ld R1,R1
+			dec R1,R1			;;R1 = 7 = &stack_top_p
+			ld R1,R1			;;R1 = &stack_top_p[last]
+			inc R1,R1
+			st R0,R1			;;stack_top_p.add( &minefield[i + 8 + 1])
+			sub R0,R0,R0
+			ld R0,R0
+			dec R0,R0
+			st R1,R0			;;stack_top_p += 1
+			
+			;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+				skip_push_lower_row_to_stack_lower_down_right_skip:
+			;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+			
+		skip_push_lower_row_to_stack_right_field:
+		*/
+		
+		
+	skip_push_lower_row_to_stack:
+	
+	
+	
+pop_stack_unmask_itself:
+	sub R1,R1,R1
+	ld R1,R1
+	shl R1,R1
+	shl R1,R1
+	shl R1,R1
+	inc R1,R1					;;R1 = 65	
+	add R1,R1,R2				;;R1 = &minefield_mask[i] = 65 + &minefield[i] 
+	sub R4,R4,R4
+	inc R4,R4					;;R4 = 1												
+	st R4,R1					;;minefield_mask[i] += 1		
+	
+	;;;;;;;;;;;;;;;;;;;TESTING;;;;;;;;;;;;;;;;;;;;;
+	;;ld R1,R2
+	;;inc R1,R1
+	;;st R1,R2			;;++minefield[i]
+	;;;;;;;;;;;;;;;;;;;TESTING;;;;;;;;;;;;;;;;;;;;;
+	
+pop_stack_end:
+	
+	jmp pop_stack_setup			;;LOOP UNTIL THE STACK IS EMPTY
+	
+	
+	
+	
+pop_stack_empty:
+
+	sub R0,R0,R0
+	sub R1,R1,R1
+	sub R1,R2,R2
+	sub R1,R3,R3
+	sub R4,R4,R4
+	sub R7,R7,R7
+	ld R7,R7
+	shr R7,R7
+	ld R7,R7
+
+	
+handle_input_center_press_end:
+
+
+
+
+
+
+cursor_boundary_collision_detection_start:
+	dec R5,R5 ;; 513
+	ld R2,R5  
+	dec R5,R5 ;; 512
+	ld R1,R5 
+	inc R5,R5 ;; 513
+	inc R5,R5 ;; 514
+	
+	;;R1 = user.x_change    R2 = user.y_change
+	
+	sub R0,R0,R0
+	ld R0,R0
+	ld R3,R0
+	inc R0,R0
+	ld R4,R0
+	;;R3 = cursor.x    R4 = cursor.y
+
+	;;
+	cursor_x_boundary_collision_detection_start:
+	;;
+	add R3,R3,R1 
+	;; R3 = new cursor.x  
+	
+	jmpns skip_cursor_x_left_boundary_collision_detection
+		;; new cursor.x < 0 
+		sub R3,R3,R3		
+		jmp cursor_x_boundary_collision_detection_end
+	skip_cursor_x_left_boundary_collision_detection:
+	
+	sub R0,R0,R0
+	ld R0,R0
+	dec R0,R0			;;R0 = 7
+	sub R0,R0,R3		;;R0 = 7 - new cursor.x 
+	jmpns skip_cursor_x_right_boundary_collision_detection
+		;; new cursor.x >= 8
+		sub R3,R3,R3
+		ld R3,R3
+		dec R3,R3		;;R3 = 7
+		jmp cursor_x_boundary_collision_detection_end
+	skip_cursor_x_right_boundary_collision_detection:
+	
+	cursor_x_boundary_collision_detection_end:
+	
+	
+	;;
+	cursor_Y_boundary_collision_detection_start:
+	;;
+	add R4,R4,R2
+	;; R4 = new cursor.y
+	
+	jmpns skip_cursor_y_bottom_boundary_collision
+		;; new cursor.y < 0
+		sub R4,R4,R4	
+		jmp cursor_Y_boundary_collision_detection_end
+	skip_cursor_y_bottom_boundary_collision:
+	
+	sub R0,R0,R0
+	ld R0,R0
+	dec R0,R0			;;R0 = 7
+	sub R0,R0,R4
+	jmpns skip_cursor_y_top_boundary_collision_detection
+		sub R4,R4,R4
+		ld R4,R4
+		dec R4,R4
+		jmp cursor_Y_boundary_collision_detection_end
+	skip_cursor_y_top_boundary_collision_detection:
+	
+	cursor_Y_boundary_collision_detection_end:
+	
+	
+cursor_boundary_collision_detection_end:
+	;;R3 , R4 = new cursor.x,y
+	;;Store the values:
+	sub R0,R0,R0
+	ld R0,R0				;;R0 = 8 = &cursor.x
+	st R3,R0
+	inc R0,R0				;;R0 = 9 = &cursor.y
+	st R4,R0
+	
+
+
+
+
+
+
+handle_input_end:
+
+	
+
+check_player_win_setup:
+	sub R0,R0,R0
+	ld R0,R0
+	mov R3,R0					;;R3 = 8 = const
+	shl R1,R0
+	shl R1,R1
+	shl R1,R1
+	inc R1,R1					;;R1 = 65 = const
+	inc R0,R0
+	inc R0,R0					;;R0 = 10 = &minefield[0]
+
+check_player_win_start:
+	ld R2,R0					;;R2 = minefield[i] 
+	jmps check_player_win_end
+	
+	sub R4,R2,R3				;;if (minefield[i] - 8) continue;
+	jmpz check_player_win_continue
+	
+	add R2,R0,R1				;;R2 = &minefield_mask[i] =
+	ld R2,R2					;;if (minefield_mask[i] == 0) the player hasn't won yet
+	jmpz frame_sync_rising_edge
+	
+	check_player_win_continue:
+		inc R0,R0
+		jmp check_player_win_start
+check_player_win_end:
+	;;Note: R0 = i    R2 = minefield[i]
+	mov R2,R2
+	jmpns frame_sync_rising_edge
+		;;else: the player won
+		jmp begin				;;RESTART THE GAME 
+
+
+
+jmp frame_sync_rising_edge
+	sub R0,R0,R0
+
+game_over:
+	sub R0,R0,R0
+	sub R1,R1,R1
+	sub R2,R2,R2
+	sub R3,R3,R3
+	sub R4,R4,R4
+	sub R6,R6,R6
+jmp game_over
+
+
+
+
+
+
+
+
+
+
+
+	
+
